@@ -61,6 +61,7 @@ import { HistorialCita } from './citas/historial-cita.entity';
 import { Comentario } from './postulaciones/comentario.entity';
 import { ArchivoOficial } from './historia-clinica/entities/archivo-oficial.entity';
 import { ArchivoTerapia } from './historia-clinica/entities/archivo-terapia.entity';
+import { Beneficio } from './beneficios/beneficios.entity';
   
 @Module({
   imports: [
@@ -126,7 +127,8 @@ import { ArchivoTerapia } from './historia-clinica/entities/archivo-terapia.enti
         
         ,Comentario,
         ArchivoOficial,
-        ArchivoTerapia
+        ArchivoTerapia,
+        Beneficio
       ],
         synchronize: false,   // true en desarrollo, false en producción
         

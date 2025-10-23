@@ -4,7 +4,7 @@ import { CreatePacienteDto } from './dto/create-paciente.dto';
 import { UpdatePacienteDto } from './dto/update-paciente.dto';
 import { CreatePacienteCompletoDto } from './dto/create-paciente-completo.dto';
 import { UpdateEstadoPacienteDto } from './dto/update-estado-paciente.dto';
-import { ApiOperation, ApiQuery } from '@nestjs/swagger';
+import { ApiOperation, ApiParam, ApiQuery, ApiResponse } from '@nestjs/swagger';
 
 @Controller('backend_api/pacientes')
 export class PacienteController {
@@ -97,6 +97,32 @@ async findAllIncludingInactive(@Query() query: any) {
   checkDocumentoExists(@Param('numeroDocumento') numeroDocumento: string) {
     return this.pacienteService.checkDocumentoExists(numeroDocumento);
   }
+  
+  @Get('beneficios/:numeroDocumento')
+    @ApiOperation({ 
+      summary: 'Verificar paciente y obtener beneficios disponibles',
+      description: 'Valida que el paciente exista y esté activo, luego retorna los beneficios disponibles'
+    })
+    @ApiParam({ 
+      name: 'numeroDocumento', 
+      description: 'Número de documento del paciente',
+      example: '12345678'
+    })
+    @ApiResponse({ 
+      status: 200, 
+      description: 'Paciente verificado y beneficios obtenidos exitosamente' 
+    })
+    @ApiResponse({ 
+      status: 404, 
+      description: 'Paciente no encontrado' 
+    })
+    @ApiResponse({ 
+      status: 403, 
+      description: 'Paciente inactivo, sin acceso a beneficios' 
+    })
+    verificarYObtenerBeneficios(@Param('numeroDocumento') numeroDocumento: string) {
+      return this.pacienteService.verificarPacienteYObtenerBeneficios(numeroDocumento);
+    }
 
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdatePacienteDto) {

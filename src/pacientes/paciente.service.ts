@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, NotFoundException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Paciente } from './paciente.entity';
@@ -12,6 +12,7 @@ import { ParejaPacienteService } from './services/pareja-paciente.service';
 import { requierePareja } from '../constants/servicios.constants';
 import { CreatePacienteCompletoDto } from './dto/create-paciente-completo.dto';
 import { UpdateEstadoPacienteDto } from './dto/update-estado-paciente.dto';
+import { BeneficiosService } from 'src/beneficios/beneficios.service';
 
 @Injectable()
 export class PacienteService {
@@ -21,6 +22,7 @@ export class PacienteService {
   constructor(
     @InjectRepository(Paciente)
     private pacienteRepository: Repository<Paciente>,
+    private readonly beneficiosService: BeneficiosService, 
     @InjectRepository(EstadoPaciente)
     private estadoPacienteRepository: Repository<EstadoPaciente>,
     @InjectRepository(PacienteServicio)
@@ -28,7 +30,51 @@ export class PacienteService {
     @InjectRepository(Servicios)
     private serviciosRepository: Repository<Servicios>,
     private parejaPacienteService: ParejaPacienteService,
+    
   ) {}
+
+  /**
+ * Verifica que el paciente exista y esté activo
+ * Si cumple las condiciones, retorna los beneficios disponibles
+ * @param numeroDocumento - Número de documento del paciente
+ */
+async verificarPacienteYObtenerBeneficios(numeroDocumento: string) {
+  // 1. Buscar el paciente por número de documento
+  const paciente = await this.pacienteRepository.findOne({
+    where: { numero_documento: numeroDocumento },
+    relations: ['tipo_documento', 'sexo', 'distrito', 'estado', 'servicio']
+  });
+
+  // 2. Validar que el paciente existe
+  if (!paciente) {
+    throw new NotFoundException(
+      'No se encontró ningún paciente registrado con el número de documento proporcionado.'
+    );
+  }
+
+  // 3. Validar que el paciente está activo
+  if (!paciente.activo) {
+    throw new ForbiddenException(
+      'El paciente se encuentra inactivo en el sistema y actualmente no cuenta con acceso a beneficios. Por favor, comuníquese con el área de atención al cliente para más información.'
+    );
+  }
+
+  // 4. Si cumple las condiciones, obtener los beneficios
+  const beneficios = await this.beneficiosService.findAll();
+
+  return {
+    paciente: {
+      id: paciente.id,
+      nombres: paciente.nombres,
+      apellido_paterno: paciente.apellido_paterno,
+      apellido_materno: paciente.apellido_materno,
+      numero_documento: paciente.numero_documento,
+      activo: paciente.activo
+    },
+    total_beneficios: beneficios.length,
+    beneficios: beneficios
+  };
+}
 
   private async verifyRecaptcha(token: string): Promise<boolean> {
     try {
