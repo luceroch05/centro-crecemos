@@ -13,6 +13,7 @@ import { requierePareja } from '../constants/servicios.constants';
 import { CreatePacienteCompletoDto } from './dto/create-paciente-completo.dto';
 import { UpdateEstadoPacienteDto } from './dto/update-estado-paciente.dto';
 import { BeneficiosService } from 'src/beneficios/beneficios.service';
+import { tieneAccesoBeneficios } from '../constants/estados-paciente.constants';
 
 @Injectable()
 export class PacienteService {
@@ -40,10 +41,15 @@ export class PacienteService {
  */
 async verificarPacienteYObtenerBeneficios(numeroDocumento: string) {
   // 1. Buscar el paciente por número de documento
-  const paciente = await this.pacienteRepository.findOne({
-    where: { numero_documento: numeroDocumento },
-    relations: ['tipo_documento', 'sexo', 'distrito', 'estado', 'servicio']
-  });
+  const paciente = await this.pacienteRepository
+    .createQueryBuilder('paciente')
+    .leftJoinAndSelect('paciente.tipo_documento', 'tipo_documento')
+    .leftJoinAndSelect('paciente.sexo', 'sexo')
+    .leftJoinAndSelect('paciente.distrito', 'distrito')
+    .leftJoinAndSelect('paciente.estado', 'estado')
+    .leftJoinAndSelect('paciente.servicio', 'servicio')
+    .where('paciente.numero_documento = :numeroDocumento', { numeroDocumento })
+    .getOne();
 
   // 2. Validar que el paciente existe
   if (!paciente) {
@@ -52,10 +58,14 @@ async verificarPacienteYObtenerBeneficios(numeroDocumento: string) {
     );
   }
 
-  // 3. Validar que el paciente está activo
-  if (!paciente.activo) {
+  // 3. Validar que el paciente tenga acceso a beneficios según su estado
+  const estadoPacienteId = paciente.estado?.id; // Obtener el ID del estado cargado
+
+
+
+  if (!tieneAccesoBeneficios(estadoPacienteId)) {
     throw new ForbiddenException(
-      'El paciente se encuentra inactivo en el sistema y actualmente no cuenta con acceso a beneficios. Por favor, comuníquese con el área de atención al cliente para más información.'
+      'El paciente no tiene acceso a beneficios en su estado actual. Solo los pacientes en estados activos pueden acceder a beneficios. Por favor, comuníquese con el área de atención al cliente para más información.'
     );
   }
 
@@ -69,13 +79,22 @@ async verificarPacienteYObtenerBeneficios(numeroDocumento: string) {
       apellido_paterno: paciente.apellido_paterno,
       apellido_materno: paciente.apellido_materno,
       numero_documento: paciente.numero_documento,
-      activo: paciente.activo
+      activo: paciente.activo,
+      estado_paciente_id: estadoPacienteId,
+      estado_nombre: paciente.estado?.nombre
     },
     total_beneficios: beneficios.length,
     beneficios: beneficios
   };
 }
 
+// Función auxiliar para validar acceso a beneficios
+tieneAccesoBeneficios(estadoPacienteId: number): boolean {
+  // Estados activos: 1 (Nuevo), 2 (Entrevista), 3 (Evaluacion), 4 (Terapia)
+  // Estado inactivo: 5 (Inactivo)
+  const estadosActivos = [1, 2, 3, 4];
+  return estadosActivos.includes(estadoPacienteId);
+}
   private async verifyRecaptcha(token: string): Promise<boolean> {
     try {
       const response = await axios.post(
